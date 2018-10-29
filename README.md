@@ -2,7 +2,7 @@
 
 A script to find admin login pages and EAR vulnerabilites.
 
-# Acknowledgments
+## Acknowledgments
 
 This Repository is Go-verion : [s0md3v/Breacher](https://github.com/s0md3v/Breacher)
 
@@ -10,11 +10,11 @@ This Repository is Go-verion : [s0md3v/Breacher](https://github.com/s0md3v/Breac
 
 ## Features
 
-- [ ] Multi-threading on demand
 - [x] Big path list (482 paths)
 - [x] Supports php, asp and html extensions
-- [ ] Checks for potential EAR vulnerabilites
 - [x] Checks for robots.txt
+- [ ] Checks for potential EAR vulnerabilites
+- [ ] Multi-threading on demand
 - [ ] Support for custom patns
 
 ## Usages
@@ -23,6 +23,9 @@ This Repository is Go-verion : [s0md3v/Breacher](https://github.com/s0md3v/Breac
 ```
 go run breacher.go -u "example.com" -t "php"
 ```
+
+
+## Todolist
 
 
 
