@@ -34,6 +34,12 @@ func gRequestHead(url string) (*grequests.Response, error) {
 	return grequests.Head(url, goptions)
 }
 
+func gRequestGet(url string) (*grequests.Response, error) {
+	goptions := newRequestOptions()
+	goptions.UserAgent = ua
+	return grequests.Get(url, goptions)
+}
+
 func drawLabel() {
 	//p(`\033[1;34m]______   ______ _______ _______ _______ _     _ _______  ______
 	//|_____] |_____/ |______ |_____| |       |_____| |______ |_____/
@@ -166,13 +172,18 @@ func divided(links []string, goroutineNum int) [][]string {
 
 func sendRequest(full_url string) {
 
-	resp, err := gRequestHead(full_url)
+	resp, err := gRequestGet(full_url)
+	body := string(resp.Bytes())
 	// Not the usual JSON so copy and paste from below
 	if err != nil {
 		pl("Unable to make request", err)
 	}
 	if resp.StatusCode == 200 {
-		pf("\033[1;32m[+]\033[0m Admin panel found: %s\n", full_url)
+		if (strings.Contains(string(body), "type=\"password\"")) {
+			pf("\033[1;32m[+]\033[0m Admin panel found: %s\n", full_url)
+		}else {
+			pf("\033[1;31m[-]\033[1;m %s\n", full_url)
+		}
 	} else if resp.StatusCode == 404 {
 		pf("\033[1;31m[-]\033[1;m %s\n", full_url)
 	} else if resp.StatusCode == 302 {
@@ -193,11 +204,10 @@ func main() {
 
 	collected_path := collectPaths(tech_type)
 	if fast_mode {
-		dividedLinks := divided(collected_path, 2)
+		dividedLinks := divided(collected_path, 5)
 
 		var wg sync.WaitGroup
 		for _, link := range dividedLinks {
-			fmt.Printf("%#v\n", len(link))
 			wg.Add(1) // Increment the WaitGroup counter.
 			go func(link []string) {
 				// Launch a goroutine to fetch the link.
