@@ -10,13 +10,14 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
+
 var pl = fmt.Println
 var pf = fmt.Printf
 
 const ua = "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36"
-
 
 func newRequestOptions() *grequests.RequestOptions {
 	return &grequests.RequestOptions{
@@ -33,7 +34,7 @@ func gRequestHead(url string) (*grequests.Response, error) {
 	return grequests.Head(url, goptions)
 }
 
-func drawLabel(){
+func drawLabel() {
 	//p(`\033[1;34m]______   ______ _______ _______ _______ _     _ _______  ______
 	//|_____] |_____/ |______ |_____| |       |_____| |______ |_____/
 	//|_____] |    \_ |______ |     | |_____  |     | |______ |    \_
@@ -45,9 +46,9 @@ func drawLabel(){
 func parseArgs() (string, string, bool) {
 	parser := argparse.NewParser("breacher.go", "Find the admin panel page") // Create new parser object
 
-	url := parser.String("u", "url", &argparse.Options{Required: true, Help: "target url"})                                                  // Create url flag
-	tech_type := parser.String("t", "type", &argparse.Options{Required: false, Help: "set the website technology type i.e. html, asp, php"}) // Create tech_type flag
-	fast_mode := parser.Flag("f", "fast", &argparse.Options{Help: "uses multithreading"})                                                    // Create fast_mode flag
+	url := parser.String("u", "url", &argparse.Options{Required: true, Help: "target url"})                                                                  // Create url flag
+	tech_type := parser.String("t", "type", &argparse.Options{Required: false, Help: "set the website technology type i.e. html, asp, php", Default: "all"}) // Create tech_type flag
+	fast_mode := parser.Flag("f", "fast", &argparse.Options{Help: "uses goroutines"})                                                                        // Create fast_mode flag
 
 	err := parser.Parse(os.Args) // Parse input
 	if err != nil {
@@ -61,7 +62,6 @@ func parseArgs() (string, string, bool) {
 	return *url, *tech_type, *fast_mode
 }
 
-
 func preHandleUrl(url string) string {
 	temp_url := strings.Replace(url, "http://", "", 1) // remove http:// from the url
 	temp_url1 := strings.Replace(temp_url, "/", "", 1) // removes / from url so we can have example.com and not example.com/
@@ -69,8 +69,7 @@ func preHandleUrl(url string) string {
 	return start_url
 }
 
-
-func findRobotstxt(url string){
+func findRobotstxt(url string) {
 	robotstxt_url := url + "/robots.txt"
 	resp, err := http.Get(robotstxt_url)
 	if err != nil {
@@ -81,9 +80,9 @@ func findRobotstxt(url string){
 	if err != nil {
 		fmt.Println("\033[1;31m[-]\033[1;m Robots.txt not found\n ", err.Error())
 	}
-	if strings.Contains(string(body), "<html>"){
+	if strings.Contains(string(body), "<html>") {
 		pl("\033[1;31m[-]\033[1;m Robots.txt not found") // if there's an html error page then its not robots.txt
-	} else{
+	} else {
 		pl("\033[1;32m[+]\033[0m Robots.txt found. Check for any interesting entry\n")
 		//pf("\033[1;32m[+]\033[0m Robots.txt url \n")
 		pl("================================\n")
@@ -91,7 +90,6 @@ func findRobotstxt(url string){
 		pl("================================\n")
 	}
 }
-
 
 func collectPaths(tech_type string) []string {
 	var paths []string
@@ -110,58 +108,109 @@ func collectPaths(tech_type string) []string {
 			break
 		}
 
-		if tech_type == "asp"{
-			if strings.Contains(path, "html") || strings.Contains(path, "php"){
+		if tech_type == "asp" {
+			if strings.Contains(path, "html") || strings.Contains(path, "php") {
 
 			} else {
 				paths = append(paths, path)
 			}
 		}
-		if tech_type == "php"{
-			if strings.Contains(path, "asp") || strings.Contains(path, "html"){
+		if tech_type == "php" {
+			if strings.Contains(path, "asp") || strings.Contains(path, "html") {
 
 			} else {
 				paths = append(paths, path)
 			}
 		}
-		if tech_type == "html"{
-			if strings.Contains(path, "asp") || strings.Contains(path, "php"){
+		if tech_type == "html" {
+			if strings.Contains(path, "asp") || strings.Contains(path, "php") {
 
 			} else {
 				paths = append(paths, path)
 			}
 		}
+		if tech_type == "all" {
+			paths = append(paths, path)
+		}
+
 	}
-	fmt.Printf("\033[1;33m[*]\033[0m collected path length is %d\n" , len(paths))
+	fmt.Printf("\033[1;33m[*]\033[0m collected path length is %d\n", len(paths))
 	return paths
 }
 
-func scan(url string, links []string)  {
+func scan(url string, links []string) {
 	pl("\033[1;33m[*]\033[0m Start to scan ")
 	for _, link := range links {
 		full_url := url + link
-		resp, err := gRequestHead(full_url)
-		// Not the usual JSON so copy and paste from below
-		if err != nil {
-			pl("Unable to make request", err)
+		sendRequest(full_url)
+	}
+}
+
+func divided(links []string, goroutineNum int) [][]string {
+	chunkSize := (len(links) + goroutineNum - 1) / goroutineNum
+
+	var dividedPath [][]string
+	for i := 0; i < len(links); i += chunkSize {
+		end := i + chunkSize
+
+		if end > len(links) {
+			end = len(links)
 		}
-		if resp.StatusCode == 200{
-			pf("\033[1;32m[+]\033[0m Admin panel found: %s\n", full_url)
-		}else if resp.StatusCode == 404{
-			pf("\033[1;31m[-]\033[1;m %s\n", full_url)
-		}else if resp.StatusCode == 302{
-			pf("\033[1;32m[+]\033[0m Potential EAR vulnerability found : %s\n", full_url)
-		}else {
-			pf("\033[1;31m[-]\033[1;m %s\n", full_url)
-		}
+
+		dividedPath = append(dividedPath, links[i:end])
+	}
+
+	return dividedPath
+
+}
+
+func sendRequest(full_url string) {
+
+	resp, err := gRequestHead(full_url)
+	// Not the usual JSON so copy and paste from below
+	if err != nil {
+		pl("Unable to make request", err)
+	}
+	if resp.StatusCode == 200 {
+		pf("\033[1;32m[+]\033[0m Admin panel found: %s\n", full_url)
+	} else if resp.StatusCode == 404 {
+		pf("\033[1;31m[-]\033[1;m %s\n", full_url)
+	} else if resp.StatusCode == 302 {
+		pf("\033[1;32m[+]\033[0m Potential EAR vulnerability found : %s\n", full_url)
+	} else {
+		pf("\033[1;31m[-]\033[1;m %s\n", full_url)
 	}
 }
 
 func main() {
+
 	drawLabel()
-	url, tech_type, _ := parseArgs()
+	url, tech_type, fast_mode := parseArgs()
+
+	startTime := time.Now() // get current time
 	start_url := preHandleUrl(url)
 	findRobotstxt(start_url)
+
 	collected_path := collectPaths(tech_type)
-	scan(start_url, collected_path)
+	if fast_mode {
+		dividedLinks := divided(collected_path, 2)
+
+		var wg sync.WaitGroup
+		for _, link := range dividedLinks {
+			fmt.Printf("%#v\n", len(link))
+			wg.Add(1) // Increment the WaitGroup counter.
+			go func(link []string) {
+				// Launch a goroutine to fetch the link.
+				scan(start_url, link)
+				// Fetch the link.
+				wg.Done()
+			}(link)
+		}
+		wg.Wait() // Wait for all goroutines to finish.
+	} else {
+		scan(start_url, collected_path)
 	}
+
+	elapsed := time.Since(startTime)
+	fmt.Println("elapsed time: ", elapsed)
+}

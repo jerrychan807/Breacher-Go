@@ -191,7 +191,7 @@
 /adminLogin.html
 /ADMIN/login.html
 /admin_login.php
-/admin_login.php]
+/admin_login.php
 /admin-login.php
 /admin-login.php/
 /admin/login.php
