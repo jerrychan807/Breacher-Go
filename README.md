@@ -16,7 +16,7 @@ This Repository is Go-verion : [s0md3v/Breacher](https://github.com/s0md3v/Breac
 - [ ] Checks for potential EAR vulnerabilites
 - [x] use goroutine
 - [ ] Support for custom patns
-- [ ] Reduce error report
+- [x] Reduce error report
 - [ ] Remove the same
 
 ## Usages
@@ -26,8 +26,13 @@ This Repository is Go-verion : [s0md3v/Breacher](https://github.com/s0md3v/Breac
 go run breacher.go -u "example.com" -t "php"
 ```
 
-
-## Todolist
-
+- Check all paths with php extension with goroutine
+```
+go run breacher.go -u example.com --type php --fast
+```
+- Check all paths without goroutine
+```
+go run breacher.go -u example.com
+```
 
 
